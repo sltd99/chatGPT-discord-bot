@@ -11,8 +11,8 @@ logger = log.setup_logger(__name__)
 isPrivate = False
 lock = asyncio.Lock()
 
-MY_GUILD = discord.Object(id=os.getenv("GUILD_ID"))  # replace with your guild id
-CHATGPT_ROLE = int(os.getenv("ROLE_ID"))
+MY_GUILD = discord.Object(id=365657158848741378)  # replace with your guild id
+CHATGPT_ROLE = 1081265204773539930
 
 
 class Client(discord.Client):
@@ -27,7 +27,7 @@ class Client(discord.Client):
 
     async def setup_hook(self):
         await self.tree.sync(guild=MY_GUILD)
-        logger.info("Slash commands synced.... ")
+        logger.info("Slash commands synced... ")
 
 
 def run_discord_bot():
@@ -70,10 +70,12 @@ def run_discord_bot():
             return
 
         async with lock:
-            chatbot.reset()
-            await interaction.response.send_message(
-                "> **Info: I have forgotten everything.**", ephemeral=False
-            )
+            await interaction.response.defer(ephemeral=False)
+
+            await chatbot.delete_conversation(chatbot.conversation_id)
+            chatbot.reset_chat()
+
+            await interaction.followup.send("> **Info: I have forgotten everything.**")
 
         logger.warning("\x1b[31mChatGPT bot has been successfully reset\x1b[0m")
 

@@ -1,4 +1,4 @@
-from revChatGPT.V3 import Chatbot
+from revChatGPT.V1 import AsyncChatbot
 from dotenv import load_dotenv
 import os
 from src import log
@@ -6,8 +6,23 @@ from src import log
 logger = log.setup_logger(__name__)
 
 load_dotenv()
-openAI_API_KEY = os.getenv("OPENAI_APIKEY")
-chatbot = Chatbot(api_key=openAI_API_KEY)
+openAI_email = os.getenv("OPENAI_EMAIL")
+openAI_password = os.getenv("OPENAI_PASSWORD")
+session_token = os.getenv("SESSION_TOKEN")
+chatbot = AsyncChatbot(
+    config={
+        "email": openAI_email,
+        "password": openAI_password,
+        "session_token": session_token,
+    }
+)
+
+
+async def handle_response(message) -> str:
+    async for response in chatbot.ask(message):
+        responseMessage = response["message"]
+
+    return responseMessage
 
 
 async def send_message(message, user_message, isPrivate=False):
@@ -15,8 +30,8 @@ async def send_message(message, user_message, isPrivate=False):
     await message.response.defer(ephemeral=isPrivate)
 
     try:
-        question = f"**<:Nahida:1037942028874555423>:  {user_message}**"
-        response = f"> <@{author}> \n\n {chatbot.ask(user_message)}"
+        question = f">>> **{user_message}**"
+        response = f"<@{author}>\n\n{await handle_response(user_message)}"
 
         await message.followup.send(question)
 
