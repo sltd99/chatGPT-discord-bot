@@ -2,14 +2,14 @@ import discord
 import os
 from discord import app_commands
 import asyncio
-from src.responses import chatbot
-from src.responses import send_message
+from src.api import reset_conversation
+from src.api import send_message
 from src import log
+from collections import defaultdict
+
+import time
 
 logger = log.setup_logger(__name__)
-
-isPrivate = False
-lock = asyncio.Lock()
 
 TEST_GUILD_ID = int(os.getenv("TEST_GUILD_ID"))
 TEST_GUILD = discord.Object(id=TEST_GUILD_ID)
@@ -19,6 +19,21 @@ OWNER_ID = int(os.getenv("OWNER_ID"))
 
 intents = discord.Intents.default()
 intents.message_content = True
+
+isPrivate = False
+
+lock = asyncio.Lock()
+is_bot_busy = defaultdict(lambda: False)
+
+
+async def set_is_busy(guild_id, is_busy):
+    async with lock:
+        is_bot_busy[guild_id] = is_busy
+
+
+async def get_is_busy(guild_id):
+    async with lock:
+        return is_bot_busy[guild_id]
 
 
 class Client(discord.Client):
@@ -51,7 +66,7 @@ def run_discord_bot():
                 case ".sync":
                     synced_commands = await client.tree.sync()
                     await message.author.send("Synced! " + str(synced_commands))
-                case ".clear":
+                case ".clear-test":
                     client.tree.clear_commands(guild=TEST_GUILD)
                     synced_commands = await client.tree.sync(guild=TEST_GUILD)
                     await message.author.send("Cleared! " + str(synced_commands))
@@ -62,41 +77,58 @@ def run_discord_bot():
 
     @client.tree.command(name="chat", description="Have a chat with ChatGPT")
     @app_commands.checks.has_role(CHATGPT_ROLE)
-    async def chat(
-        interaction: discord.Interaction, message: app_commands.Range[str, 1, 1970]
-    ):
-        if interaction.user == client.user:
-            return
+    async def chat(interaction: discord.Interaction, message: str):
+        guild_id = interaction.guild_id
 
-        if lock.locked():
+        print(interaction.guild.name)
+        if await get_is_busy(guild_id):
             await interaction.response.send_message(
                 "> **Warn: The bot is currently busy, please wait for the previous message to be sent!**",
                 ephemeral=True,
             )
             return
 
-        async with lock:
-            username = str(interaction.user)
-            user_message = message
-            channel = str(interaction.channel)
-            logger.info(f"\x1b[31m{username}\x1b[0m : '{user_message}' ({channel})")
-            await send_message(interaction, user_message)
+        await set_is_busy(guild_id, True)
+
+        await interaction.response.defer(ephemeral=isPrivate)
+        username = str(interaction.user)
+        userid = str(interaction.user.id)
+        guild = str(interaction.guild)
+        channel = str(interaction.channel)
+        conversation_id = f"{interaction.guild_id}-{interaction.channel_id}"
+
+        responses = await client.loop.run_in_executor(
+            None, send_message, conversation_id, userid, message
+        )
+
+        for response in responses:
+            await interaction.followup.send(response, ephemeral=isPrivate)
+
+        await set_is_busy(guild_id, False)
+
+        logger.info(f"\x1b[31m{username}\x1b[0m : '{message}' ({guild}-{channel})")
 
     @client.tree.command(name="reset", description="Reset current conversation")
     @app_commands.checks.has_role(CHATGPT_ROLE)
     async def reset(interaction: discord.Interaction):
-        if lock.locked():
+        guild_id = interaction.guild_id
+
+        print(interaction.guild.name)
+        if await get_is_busy(guild_id):
             await interaction.response.send_message(
                 "> **Warn: The bot is currently busy, please try again later!**",
                 ephemeral=True,
             )
             return
 
-        async with lock:
-            chatbot.reset()
-            await interaction.response.send_message(
-                "> **Info: I have forgotten everything.**", ephemeral=False
-            )
+        await set_is_busy(guild_id, True)
+
+        reset_conversation(f"{interaction.guild.id}-{interaction.channel.id}")
+        await interaction.response.send_message(
+            "> **Info: I have forgotten everything.**", ephemeral=False
+        )
+
+        await set_is_busy(guild_id, False)
 
         logger.warning("\x1b[31mChatGPT bot has been successfully reset\x1b[0m")
 
@@ -110,38 +142,6 @@ def run_discord_bot():
             ephemeral=True,
         )
 
-    # @client.tree.command(name="private", description="Toggle private access")
-    # async def private(interaction: discord.Interaction):
-    #     global isPrivate
-    #     await interaction.response.defer(ephemeral=False)
-    #     if not isPrivate:
-    #         isPrivate = not isPrivate
-    #         logger.warning("\x1b[31mSwitch to private mode\x1b[0m")
-    #         await interaction.followup.send(
-    #             "> **Info: Next, the response will be sent via private message. If you want to switch back to public mode, use `/public`**"
-    #         )
-    #     else:
-    #         logger.info("You already on private mode!")
-    #         await interaction.followup.send(
-    #             "> **Warn: You already on private mode. If you want to switch to public mode, use `/public`**"
-    #         )
-
-    # @client.tree.command(name="public", description="Toggle public access")
-    # async def public(interaction: discord.Interaction):
-    #     global isPrivate
-    #     await interaction.response.defer(ephemeral=False)
-    #     if isPrivate:
-    #         isPrivate = not isPrivate
-    #         await interaction.followup.send(
-    #             "> **Info: Next, the response will be sent to the channel directly. If you want to switch back to private mode, use `/private`**"
-    #         )
-    #         logger.warning("\x1b[31mSwitch to public mode\x1b[0m")
-    #     else:
-    #         await interaction.followup.send(
-    #             "> **Warn: You already on public mode. If you want to switch to private mode, use `/private`**"
-    #         )
-    #         logger.info("You already on public mode!")
-
     @client.tree.error
     async def on_app_command_error(
         interaction: discord.Interaction, error: discord.app_commands.AppCommandError
@@ -151,6 +151,11 @@ def run_discord_bot():
                 f"> **ERROR: You do not have permission to access this command!**",
                 ephemeral=True,
             )
+        # else:
+        #     await interaction.response.send_message(
+        #         f"> **Error: Something went wrong, please try again later!**",
+        #         ephemeral=True,
+        #     )
 
     TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 

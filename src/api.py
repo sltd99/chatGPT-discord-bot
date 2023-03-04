@@ -2,23 +2,40 @@ from revChatGPT.V3 import Chatbot
 from dotenv import load_dotenv
 import os
 from src import log
+from collections import defaultdict
+from discord import Interaction
 
 logger = log.setup_logger(__name__)
 
 load_dotenv()
 openAI_API_KEY = os.getenv("OPENAI_APIKEY")
+
 chatbot = Chatbot(api_key=openAI_API_KEY)
 
+chatbot.conversation = defaultdict(
+    lambda: [
+        {
+            "role": "system",
+            "content": chatbot.system_prompt,
+        },
+    ]
+)
 
-async def send_message(message, user_message, isPrivate=False):
-    author = message.user.id
-    await message.response.defer(ephemeral=isPrivate)
 
+def reset_conversation(conversation_id: str):
+    chatbot.reset(conversation_id)
+
+
+def send_message(conversation_id: str, userid: str, message: str):
+    responses = []
     try:
-        question = f"**<:Nahida:1037942028874555423>:  {user_message}**"
-        response = f"> <@{author}> \n\n {chatbot.ask(user_message)}"
+        question = f"**<:03:926690697418014721> Q: {message}**"
 
-        await message.followup.send(question)
+        response = (
+            f"> <@{userid}> \n\n {chatbot.ask(message, convo_id=conversation_id)}"
+        )
+
+        responses.append(question)
 
         char_limit = 1900
         if len(response) > char_limit:
@@ -30,7 +47,7 @@ async def send_message(message, user_message, isPrivate=False):
 
                 for i in range(0, len(parts)):
                     if i % 2 == 0:  # indices that are even are not code blocks
-                        await message.followup.send(parts[i])
+                        responses.append(parts[i])
 
                     # Send the code block in a seperate message
                     else:  # Odd-numbered parts are code blocks
@@ -52,11 +69,9 @@ async def send_message(message, user_message, isPrivate=False):
                                 for i in range(0, len(formatted_code_block), char_limit)
                             ]
                             for chunk in code_block_chunks:
-                                await message.followup.send("```" + chunk + "```")
+                                responses.append("```" + chunk + "```")
                         else:
-                            await message.followup.send(
-                                "```" + formatted_code_block + "```"
-                            )
+                            responses.append("```" + formatted_code_block + "```")
 
             else:
                 response_chunks = [
@@ -65,13 +80,14 @@ async def send_message(message, user_message, isPrivate=False):
                 ]
 
                 for chunk in response_chunks:
-                    await message.followup.send(chunk)
+                    responses.append(chunk)
 
         else:
-            await message.followup.send(response)
+            responses.append(response)
 
     except Exception as e:
-        await message.followup.send(
-            "> **Error: Something went wrong, please try again later!**"
-        )
+        responses.append("> **Error: Something went wrong, please try again later!**")
         logger.exception(f"Error while sending message: {e}")
+
+    finally:
+        return responses
