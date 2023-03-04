@@ -11,14 +11,19 @@ logger = log.setup_logger(__name__)
 isPrivate = False
 lock = asyncio.Lock()
 
-MY_GUILD = discord.Object(id=os.getenv("GUILD_ID"))  # replace with your guild id
-CHATGPT_ROLE = int(os.getenv("ROLE_ID"))
+TEST_GUILD_ID = int(os.getenv("TEST_GUILD_ID"))
+TEST_GUILD = discord.Object(id=TEST_GUILD_ID)
+
+CHATGPT_ROLE = os.getenv("CHATGPT_ROLE")
+OWNER_ID = int(os.getenv("OWNER_ID"))
+
+intents = discord.Intents.default()
+intents.message_content = True
 
 
 class Client(discord.Client):
     def __init__(self) -> None:
-        intents = discord.Intents.default()
-        intents.message_content = True
+
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
         self.activity = discord.Activity(
@@ -26,12 +31,30 @@ class Client(discord.Client):
         )
 
     async def setup_hook(self):
-        await self.tree.sync(guild=MY_GUILD)
-        logger.info("Slash commands synced.... ")
+        # self.tree.copy_global_to(guild=TEST_GUILD)
+        # synced_commands = await self.tree.sync(guild=TEST_GUILD)
+        # logger.info("Slash commands synced to test guild..." + str(synced_commands))
+        pass
 
 
 def run_discord_bot():
     client = Client()
+
+    @client.event
+    async def on_message(message: discord.Message):
+        if message.author == client.user:
+            return
+
+        if not message.guild and message.author.id == OWNER_ID:
+
+            match message.content:
+                case ".sync":
+                    synced_commands = await client.tree.sync()
+                    await message.author.send("Synced! " + str(synced_commands))
+                case ".clear":
+                    client.tree.clear_commands(guild=TEST_GUILD)
+                    synced_commands = await client.tree.sync(guild=TEST_GUILD)
+                    await message.author.send("Cleared! " + str(synced_commands))
 
     @client.event
     async def on_ready():
@@ -81,7 +104,7 @@ def run_discord_bot():
     @app_commands.checks.has_role(CHATGPT_ROLE)
     async def help(interaction: discord.Interaction):
         await interaction.response.send_message(
-            """:star:**BASIC COMMANDS** \n
+            """:star: **BASIC COMMANDS**
         - `/chat [message]` Chat with ChatGPT!
         - `/reset` Clear ChatGPT conversation history""",
             ephemeral=True,
