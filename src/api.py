@@ -37,21 +37,26 @@ def send_message(conversation_id: str, userid: str, username: str, message: str)
     try:
         responses = []
 
-        if len(message) > 1933:
+        if len(message) > 1900:
             raise ValueError("Message too long!")
 
         response = chatbot.ask(message, convo_id=conversation_id)
 
-        pages = _paginate(response, 1933, preserve=True)
+        question = f"> {Q_EMOJI} **Q: {message}**\n\一一一\n"
+
+        pages = _paginate(f"{question}\n{response}", 1950, preserve=True)
         total = len(pages)
 
         for i, page in enumerate(pages):
+
+            page_counter = f" `[{i+1}/{total}]`" if total > 1 else ""
+
             if i == 0:
                 responses.append(
-                    f"> {Q_EMOJI} **Q: {message}**\n\一一一\n> {A_EMOJI} `[{i+1}/{total}]` <@{userid}>\n\n{page}"
+                    f"{question}{A_EMOJI}{page_counter}\n\n{page[len(question)+1:]}"
                 )
             else:
-                responses.append(f"> {A_EMOJI} `[{i+1}/{total}]`\n\n{page}")
+                responses.append(f"{A_EMOJI}{page_counter}\n\n{page}")
 
         return responses
 

@@ -108,7 +108,7 @@ def run_discord_bot():
 
             logger.info(f"\x1b[31m{username}\x1b[0m : '{message}' ({guild}-{channel})")
         except Exception as e:
-            logger.error(e)
+            logger.error("/chat has an error\n" + e)
             raise e
 
         finally:
@@ -136,7 +136,7 @@ def run_discord_bot():
             )
             logger.warning("\x1b[31mChatGPT bot has been successfully reset\x1b[0m")
         except Exception as e:
-            logger.error(e)
+            logger.error("/reset has an error\n" + e)
             raise e
         finally:
             await set_is_busy(guild_id, False)
