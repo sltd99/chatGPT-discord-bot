@@ -60,7 +60,7 @@ def _paginate(text: str, max_size: int = 2000, preserve: bool = True):
     # If the text is empty or shorter than the max size, return it as it is
     if len(text) == 0 or len(text) <= max_size:
         pages.append(text)
-        return
+        return pages
 
     # If preserving newlines and code blocks, use a regular expression to split the text by them
     if preserve:
