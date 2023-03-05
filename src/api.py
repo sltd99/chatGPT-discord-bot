@@ -12,6 +12,9 @@ openAI_API_KEY = os.getenv("OPENAI_APIKEY")
 
 chatbot = Chatbot(api_key=openAI_API_KEY)
 
+chatbot.temperature = float(os.getenv("TEMPERATURE", 2))
+chatbot.max_tokens = int(os.getenv("MAX_TOKENS", 4096))
+
 chatbot.conversation = defaultdict(
     lambda: [
         {
@@ -33,10 +36,8 @@ A_EMOJI = os.getenv("A_EMOJI")
 def send_message(conversation_id: str, userid: str, username: str, message: str):
     try:
         responses = []
-        question = f"> {Q_EMOJI} **Q: {message}**"
-        responses.append(question)
 
-        if len(question) > 2000:
+        if len(message) > 1933:
             raise ValueError("Message too long!")
 
         response = chatbot.ask(message, convo_id=conversation_id)
@@ -45,7 +46,12 @@ def send_message(conversation_id: str, userid: str, username: str, message: str)
         total = len(pages)
 
         for i, page in enumerate(pages):
-            responses.append(f"> {A_EMOJI} `[{i+1}/{total}]` <@{userid}>\n\n{page}")
+            if i == 0:
+                responses.append(
+                    f"> {Q_EMOJI} **Q: {message}**\n\一一一\n> {A_EMOJI} `[{i+1}/{total}]` <@{userid}>\n\n{page}"
+                )
+            else:
+                responses.append(f"> {A_EMOJI} `[{i+1}/{total}]` <@{userid}>\n\n{page}")
 
         return responses
 
