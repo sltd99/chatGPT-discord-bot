@@ -7,6 +7,7 @@ from src.api import send_message
 from src import log
 from collections import defaultdict
 
+
 import time
 
 logger = log.setup_logger(__name__)
@@ -83,7 +84,7 @@ def run_discord_bot():
         print(interaction.guild.name)
         if await get_is_busy(guild_id):
             await interaction.response.send_message(
-                "> **Warn: The bot is currently busy, please wait for the previous message to be sent!**",
+                "> :warning: **Warn: The bot is currently busy, please wait for the previous message to be sent!**",
                 ephemeral=True,
             )
             return
@@ -98,7 +99,7 @@ def run_discord_bot():
         conversation_id = f"{interaction.guild_id}-{interaction.channel_id}"
 
         responses = await client.loop.run_in_executor(
-            None, send_message, conversation_id, userid, message
+            None, send_message, conversation_id, userid, username, message
         )
 
         for response in responses:
@@ -116,7 +117,7 @@ def run_discord_bot():
         print(interaction.guild.name)
         if await get_is_busy(guild_id):
             await interaction.response.send_message(
-                "> **Warn: The bot is currently busy, please try again later!**",
+                "> :warning: **Warn: The bot is currently busy, please try again later!**",
                 ephemeral=True,
             )
             return
@@ -125,7 +126,7 @@ def run_discord_bot():
 
         reset_conversation(f"{interaction.guild.id}-{interaction.channel.id}")
         await interaction.response.send_message(
-            "> **Info: I have forgotten everything.**", ephemeral=False
+            "> :smiling_imp: **Info: I have forgotten everything.**", ephemeral=False
         )
 
         await set_is_busy(guild_id, False)
@@ -148,14 +149,14 @@ def run_discord_bot():
     ) -> None:
         if isinstance(error, app_commands.errors.MissingRole):
             await interaction.response.send_message(
-                f"> **ERROR: You do not have permission to access this command!**",
+                f"> :x: **ERROR: You do not have permission to access this command!**",
                 ephemeral=True,
             )
-        # else:
-        #     await interaction.response.send_message(
-        #         f"> **Error: Something went wrong, please try again later!**",
-        #         ephemeral=True,
-        #     )
+        else:
+            await interaction.response.send_message(
+                f"> :x: **ERROR: Something went wrong, please try again later!**",
+                ephemeral=True,
+            )
 
     TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
