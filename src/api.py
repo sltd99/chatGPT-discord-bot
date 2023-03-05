@@ -12,7 +12,7 @@ openAI_API_KEY = os.getenv("OPENAI_APIKEY")
 
 chatbot = Chatbot(api_key=openAI_API_KEY)
 
-chatbot.temperature = float(os.getenv("TEMPERATURE", 2))
+chatbot.temperature = float(os.getenv("TEMPERATURE", 1))
 chatbot.max_tokens = int(os.getenv("MAX_TOKENS", 4096))
 
 chatbot.conversation = defaultdict(
@@ -51,7 +51,7 @@ def send_message(conversation_id: str, userid: str, username: str, message: str)
                     f"> {Q_EMOJI} **Q: {message}**\n\一一一\n> {A_EMOJI} `[{i+1}/{total}]` <@{userid}>\n\n{page}"
                 )
             else:
-                responses.append(f"> {A_EMOJI} `[{i+1}/{total}]` <@{userid}>\n\n{page}")
+                responses.append(f"> {A_EMOJI} `[{i+1}/{total}]`\n\n{page}")
 
         return responses
 
